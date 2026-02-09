@@ -1,0 +1,416 @@
+@startuml Honda Motorcycle Leasing ERD
+
+!define TABLE(name) entity name << (T,#FFAAAA) >>
+!define PK(x) <b>x</b>
+!define FK(x) <i>x</i>
+
+skinparam backgroundColor #FEFEFE
+skinparam entity {
+    BackgroundColor #F9F9FF
+    BorderColor #666666
+    ArrowColor #666666
+}
+skinparam linetype ortho
+
+title Honda Motorcycle Leasing Database Design
+
+' ==========================================
+' USER & ROLE MANAGEMENT
+' ==========================================
+together {
+    TABLE(roles) {
+        PK(id) : UUID
+        --
+        name : VARCHAR(50) <<unique>>
+        description : TEXT
+        created_at : TIMESTAMP
+    }
+
+    TABLE(users) {
+        PK(id) : UUID
+        --
+        email : VARCHAR(255) <<unique>>
+        password_hash : VARCHAR(255)
+        full_name : VARCHAR(100)
+        phone_number : VARCHAR(20)
+        address : TEXT
+        latitude : DECIMAL(10,8)
+        longitude : DECIMAL(11,8)
+        id_card_number : VARCHAR(50) <<unique>>
+        FK(role_id) : UUID
+        is_active : BOOLEAN
+        created_at : TIMESTAMP
+        updated_at : TIMESTAMP
+    }
+}
+note top of roles
+    Roles:
+    - customer
+    - dealer_delivery
+    - leasing_officer
+end note
+
+' ==========================================
+' MOTORCYCLE CATALOG
+' ==========================================
+together {
+    TABLE(motorcycle_types) {
+        PK(id) : UUID
+        --
+        type_code : VARCHAR(20) <<unique>>
+        type_name : VARCHAR(50)
+        description : TEXT
+        created_at : TIMESTAMP
+    }
+
+    TABLE(motorcycles) {
+        PK(id) : UUID
+        --
+        FK(type_id) : UUID
+        model_name : VARCHAR(100)
+        model_year : INT
+        engine_cc : INT
+        color : VARCHAR(50)
+        price : DECIMAL(15,2)
+        stock : INT
+        image_url : TEXT
+        description : TEXT
+        is_available : BOOLEAN
+        created_at : TIMESTAMP
+        updated_at : TIMESTAMP
+    }
+}
+note top of motorcycle_types
+    Types: MATIC | SPORT | CLASSIC
+end note
+
+' ==========================================
+' PROMO MANAGEMENT
+' ==========================================
+TABLE(promos) {
+    PK(id) : UUID
+    --
+    promo_code : VARCHAR(50) <<unique>>
+    promo_name : VARCHAR(100)
+    description : TEXT
+    discount_type : VARCHAR(20)
+    discount_value : DECIMAL(15,2)
+    min_dp_amount : DECIMAL(15,2)
+    max_discount : DECIMAL(15,2)
+    FK(motorcycle_type_id) : UUID
+    start_date : DATE
+    end_date : DATE
+    is_active : BOOLEAN
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+}
+note left of promos
+    Discount Types:
+    - PERCENTAGE
+    - FIXED_AMOUNT
+end note
+
+' ==========================================
+' STATUS DEFINITIONS
+' ==========================================
+TABLE(order_statuses) {
+    PK(id) : UUID
+    --
+    status_code : VARCHAR(50) <<unique>>
+    status_name : VARCHAR(100)
+    description : TEXT
+    phase : VARCHAR(20)
+    display_order : INT
+    is_active : BOOLEAN
+    created_at : TIMESTAMP
+}
+note right of order_statuses
+    Tracking Steps:
+    1. REQUEST_DITERIMA
+    2. AUTO_PRE_SCORING
+    3. PRE_APPROVAL_OFFICER
+    4. SURVEYOR_KE_RUMAH
+    5. HASIL_SURVEYOR
+    6. FINAL_SCORING
+    7. JADWAL_AKAD
+    8. SIGN_KONTRAK
+    9. BAYAR_DP_BIAYA
+    10. TERBITKAN_PO
+    11. FEASIBILITY_CHECK
+    12. KIRIM_MOTOR
+    13. MOTOR_DITERIMA
+    14. TERIMA_DOKUMEN
+    15. ORDER_CLOSED
+end note
+
+' ==========================================
+' ORDER (CENTER)
+' ==========================================
+TABLE(orders) {
+    PK(id) : UUID
+    --
+    order_number : VARCHAR(50) <<unique>>
+    FK(customer_id) : UUID
+    FK(motorcycle_id) : UUID
+    FK(leasing_officer_id) : UUID
+    FK(dealer_delivery_id) : UUID
+    FK(promo_id) : UUID
+    FK(current_status_id) : UUID
+    --
+    down_payment : DECIMAL(15,2)
+    leasing_term_months : INT
+    monthly_installment : DECIMAL(15,2)
+    discount_amount : DECIMAL(15,2)
+    --
+    id_card_photo_url : TEXT
+    salary_slip_url : TEXT
+    family_card_url : TEXT
+    bank_statement_url : TEXT
+    --
+    delivery_address : TEXT
+    delivery_latitude : DECIMAL(10,8)
+    delivery_longitude : DECIMAL(11,8)
+    --
+    notes : TEXT
+    total_price : DECIMAL(15,2)
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+}
+
+' ==========================================
+' ORDER TRACKING
+' ==========================================
+TABLE(order_tracking) {
+    PK(id) : UUID
+    --
+    FK(order_id) : UUID
+    FK(status_id) : UUID
+    FK(updated_by_user_id) : UUID
+    --
+    is_completed : BOOLEAN
+    completed_at : TIMESTAMP
+    remarks : TEXT
+    attachment_url : TEXT
+    created_at : TIMESTAMP
+}
+
+' ==========================================
+' DELIVERY GROUP
+' ==========================================
+together {
+    TABLE(delivery_assignments) {
+        PK(id) : UUID
+        --
+        FK(order_id) : UUID
+        FK(dealer_delivery_id) : UUID
+        --
+        delivery_status : VARCHAR(50)
+        scheduled_date : DATE
+        actual_delivery_date : DATE
+        delivery_address : TEXT
+        delivery_latitude : DECIMAL(10,8)
+        delivery_longitude : DECIMAL(11,8)
+        recipient_name : VARCHAR(100)
+        recipient_phone : VARCHAR(20)
+        delivery_notes : TEXT
+        created_at : TIMESTAMP
+        updated_at : TIMESTAMP
+    }
+
+    TABLE(delivery_proofs) {
+        PK(id) : UUID
+        --
+        FK(delivery_assignment_id) : UUID
+        --
+        proof_type : VARCHAR(50)
+        photo_url : TEXT
+        signature_url : TEXT
+        recipient_id_card_photo : TEXT
+        notes : TEXT
+        captured_latitude : DECIMAL(10,8)
+        captured_longitude : DECIMAL(11,8)
+        captured_at : TIMESTAMP
+        created_at : TIMESTAMP
+    }
+}
+note bottom of delivery_assignments
+    Status: REQUEST → PROGRESS → COMPLETED
+end note
+
+note bottom of delivery_proofs
+    Proof Types:
+    - PHOTO_DELIVERY
+    - SIGNATURE
+    - ID_VERIFICATION
+end note
+
+' ==========================================
+' VERIFICATION GROUP
+' ==========================================
+together {
+    TABLE(leasing_verifications) {
+        PK(id) : UUID
+        --
+        FK(order_id) : UUID
+        FK(leasing_officer_id) : UUID
+        --
+        verification_status : VARCHAR(50)
+        credit_score : INT
+        pre_scoring_result : VARCHAR(50)
+        final_scoring_result : VARCHAR(50)
+        is_documents_verified : BOOLEAN
+        is_income_verified : BOOLEAN
+        is_address_verified : BOOLEAN
+        surveyor_notes : TEXT
+        rejection_reason : TEXT
+        approval_notes : TEXT
+        verified_at : TIMESTAMP
+        created_at : TIMESTAMP
+        updated_at : TIMESTAMP
+    }
+
+    TABLE(surveyor_visits) {
+        PK(id) : UUID
+        --
+        FK(order_id) : UUID
+        FK(surveyor_user_id) : UUID
+        --
+        visit_status : VARCHAR(50)
+        scheduled_date : DATE
+        actual_visit_date : DATE
+        visit_latitude : DECIMAL(10,8)
+        visit_longitude : DECIMAL(11,8)
+        house_photo_url : TEXT
+        environment_photo_url : TEXT
+        address_verified : BOOLEAN
+        income_verified : BOOLEAN
+        notes : TEXT
+        created_at : TIMESTAMP
+        updated_at : TIMESTAMP
+    }
+}
+note bottom of leasing_verifications
+    Status: REQUEST → PROGRESS →
+    PENDING → COMPLETED / CANCELED
+end note
+
+' ==========================================
+' CONTRACTS & DOCUMENTS GROUP
+' ==========================================
+together {
+    TABLE(contracts) {
+        PK(id) : UUID
+        --
+        FK(order_id) : UUID
+        --
+        contract_number : VARCHAR(50) <<unique>>
+        contract_date : DATE
+        akad_scheduled_date : DATE
+        akad_actual_date : DATE
+        contract_document_url : TEXT
+        signed_contract_url : TEXT
+        is_signed : BOOLEAN
+        signed_at : TIMESTAMP
+        created_at : TIMESTAMP
+        updated_at : TIMESTAMP
+    }
+
+    TABLE(vehicle_documents) {
+        PK(id) : UUID
+        --
+        FK(order_id) : UUID
+        --
+        document_type : VARCHAR(50)
+        document_number : VARCHAR(100)
+        document_url : TEXT
+        issue_date : DATE
+        received_date : DATE
+        is_received_by_customer : BOOLEAN
+        received_at : TIMESTAMP
+        created_at : TIMESTAMP
+        updated_at : TIMESTAMP
+    }
+}
+note bottom of vehicle_documents
+    Types: STNK | BPKB | FAKTUR | NIK
+end note
+
+' ==========================================
+' PAYMENTS & NOTIFICATIONS
+' ==========================================
+together {
+    TABLE(payments) {
+        PK(id) : UUID
+        --
+        FK(order_id) : UUID
+        --
+        payment_type : VARCHAR(50)
+        amount : DECIMAL(15,2)
+        payment_method : VARCHAR(50)
+        payment_status : VARCHAR(50)
+        payment_proof_url : TEXT
+        paid_at : TIMESTAMP
+        verified_at : TIMESTAMP
+        notes : TEXT
+        created_at : TIMESTAMP
+        updated_at : TIMESTAMP
+    }
+
+    TABLE(notifications) {
+        PK(id) : UUID
+        --
+        FK(user_id) : UUID
+        FK(order_id) : UUID
+        --
+        title : VARCHAR(255)
+        message : TEXT
+        is_read : BOOLEAN
+        notification_type : VARCHAR(50)
+        created_at : TIMESTAMP
+    }
+}
+note bottom of payments
+    Types: DOWN_PAYMENT | ADMIN_FEE |
+    INSURANCE | OTHER_FEES
+end note
+
+' ==========================================
+' RELATIONSHIPS (Organized)
+' ==========================================
+
+' User & Role
+roles ||--right--o{ users : "has"
+
+' Motorcycle hierarchy
+motorcycle_types ||--down--o{ motorcycles : "categorizes"
+motorcycle_types ||--left--o{ promos : "applies to"
+
+' Main connections to Orders
+users ||--down--o{ orders : "places/handles"
+motorcycles ||--down--o{ orders : "ordered in"
+promos ||--down--o{ orders : "applied to"
+order_statuses ||--left--o{ orders : "current"
+
+' Order children - Left side
+orders ||--left--o{ order_tracking : "tracks"
+order_statuses ||--down--o{ order_tracking : "status of"
+users ||--down--o{ order_tracking : "updated by"
+
+' Order children - Right side
+orders ||--right--o| delivery_assignments : "delivered via"
+delivery_assignments ||--down--o{ delivery_proofs : "proven by"
+
+' Order children - Bottom left
+orders ||--down--o| leasing_verifications : "verified by"
+orders ||--down--o| surveyor_visits : "surveyed in"
+
+' Order children - Bottom right
+orders ||--down--o| contracts : "contracted in"
+orders ||--down--o{ vehicle_documents : "documents for"
+
+' Order children - Bottom
+orders ||--down--o{ payments : "paid via"
+orders ||--down--o{ notifications : "notifies"
+users ||--down--o{ notifications : "receives"
+
+@enduml
